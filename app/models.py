@@ -21,6 +21,7 @@ class FailureReason(enum.Enum):
     """所有被拒绝操作的可区分原因。"""
 
     ACCOUNT_DISABLED = "account_disabled"
+    ACCOUNT_BANNED = "account_banned"
     BAD_CREDENTIALS = "bad_credentials"
     SESSION_EXPIRED = "session_expired"
     SESSION_REVOKED = "session_revoked"
@@ -37,6 +38,7 @@ class User:
     tenant_id: str
     password: str
     disabled: bool = False
+    banned: bool = False
     roles: frozenset[Role] = field(default_factory=frozenset)
 
 

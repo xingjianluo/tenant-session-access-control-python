@@ -47,3 +47,38 @@ def test_login_failures_distinguishable():
     assert r.status_code == 401 and r.json()["detail"] == "bad_credentials"
     r = client.post("/login", json={"user_id": "dave", "password": "pw-dave"})
     assert r.status_code == 401 and r.json()["detail"] == "account_disabled"
+
+
+def test_admin_ban_unban_lifecycle():
+    # 登录拿到两台设备的会话
+    r = client.post("/login", json={"user_id": "erin", "password": "pw-erin"})
+    token1 = r.json()["token"]
+    r = client.post("/login", json={"user_id": "erin", "password": "pw-erin"})
+    token2 = r.json()["token"]
+    assert client.get("/check", params={"token": token1, "tenant_id": "tenant-a",
+                                        "permission": "read"}).json() == {"allowed": True}
+
+    # 后台封禁：立即全设备失效，原因可与密码错误/过期区分
+    r = client.post("/admin/ban", json={"user_id": "erin"})
+    assert r.status_code == 200 and r.json() == {"banned": "erin"}
+    for t in (token1, token2):
+        r = client.get("/check", params={"token": t, "tenant_id": "tenant-a",
+                                         "permission": "read"})
+        logger.info("check after ban -> %s", r.json())
+        assert r.status_code == 401 and r.json()["detail"] == "account_banned"
+    r = client.post("/login", json={"user_id": "erin", "password": "pw-erin"})
+    assert r.status_code == 401 and r.json()["detail"] == "account_banned"
+
+    # 解封不救活老会话，需要重新登录
+    r = client.post("/admin/unban", json={"user_id": "erin"})
+    assert r.status_code == 200 and r.json() == {"unbanned": "erin"}
+    r = client.get("/check", params={"token": token1, "tenant_id": "tenant-a",
+                                     "permission": "read"})
+    logger.info("old session after unban -> %s", r.json())
+    assert r.status_code == 401 and r.json()["detail"] == "session_revoked"
+    r = client.post("/login", json={"user_id": "erin", "password": "pw-erin"})
+    assert r.status_code == 200 and r.json()["token"]
+
+    # 不存在的用户
+    r = client.post("/admin/ban", json={"user_id": "ghost"})
+    assert r.status_code == 404 and r.json()["detail"] == "user_not_found"

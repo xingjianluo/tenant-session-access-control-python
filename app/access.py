@@ -39,10 +39,14 @@ class AccessControl:
         self._store = store
 
     def begin_request(self, user_id: str) -> RequestContext | None:
-        """在请求入口捕获快照；用户不存在时返回 None。"""
+        """在请求入口捕获快照；用户不存在或已被封禁时返回 None。
+
+        被封账号不允许建立任何授权快照；封禁原因的可区分性由
+        AuthService.validate（ACCOUNT_BANNED）在更外层提供。
+        """
         with self._store.lock:
             user = self._store.get_user(user_id)
-            if user is None:
+            if user is None or user.banned:
                 return None
             return RequestContext(
                 user_id=user.user_id,

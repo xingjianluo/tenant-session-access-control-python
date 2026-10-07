@@ -41,6 +41,25 @@ class InMemoryStore:
                 tenant_id=user.tenant_id,
                 password=user.password,
                 disabled=disabled,
+                banned=user.banned,
+                roles=user.roles,
+            )
+
+    def set_banned(self, user_id: str, banned: bool) -> None:
+        """置账号封禁标记，不动会话。
+
+        封禁时的会话撤销由 AuthService.ban_account 在同一把锁内
+        一起完成；解封刻意不恢复任何会话，封禁前的老会话必须
+        保持撤销状态，用户需要重新登录。
+        """
+        with self._lock:
+            user = self._users[user_id]
+            self._users[user_id] = User(
+                user_id=user.user_id,
+                tenant_id=user.tenant_id,
+                password=user.password,
+                disabled=user.disabled,
+                banned=banned,
                 roles=user.roles,
             )
 
