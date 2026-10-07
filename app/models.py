@@ -21,6 +21,7 @@ class FailureReason(enum.Enum):
     """所有被拒绝操作的可区分原因。"""
 
     ACCOUNT_DISABLED = "account_disabled"
+    USER_NOT_FOUND = "user_not_found"
     BAD_CREDENTIALS = "bad_credentials"
     SESSION_EXPIRED = "session_expired"
     SESSION_REVOKED = "session_revoked"

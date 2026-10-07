@@ -30,6 +30,18 @@ class TokenBody(BaseModel):
     token: str
 
 
+class AdminBody(BaseModel):
+    user_id: str
+
+
+# 授权判定类原因走 403；凭据/会话/封禁类原因走 401。
+_AUTHZ_REASONS = {
+    FailureReason.CROSS_TENANT,
+    FailureReason.PERMISSION_DENIED,
+    FailureReason.UNKNOWN_PERMISSION,
+}
+
+
 def _reject(reason: FailureReason, status: int) -> None:
     raise HTTPException(status_code=status, detail=reason.value)
 
@@ -65,14 +77,31 @@ def logout(body: TokenBody):
 
 @app.get("/check")
 def check(token: str, tenant_id: str, permission: str):
-    session, reason = auth.validate(token)
+    _ctx, reason = access.authorize(auth, token, tenant_id, permission)
     if reason is not None:
-        _reject(reason, 401)
-    ctx = access.begin_request(session.user_id)
-    deny = access.check(ctx, tenant_id, permission)
-    if deny is not None:
-        _reject(deny, 403)
+        status = 403 if reason in _AUTHZ_REASONS else 401
+        _reject(reason, status)
     return {"allowed": True}
+
+
+@app.post("/admin/ban")
+def admin_ban(body: AdminBody):
+    """后台封封口子（本地演示未加管理端鉴权，生产应置于管理权限之后）。"""
+    revoked, reason = auth.ban_user(body.user_id)
+    if reason is not None:
+        status = 404 if reason is FailureReason.USER_NOT_FOUND else 400
+        _reject(reason, status)
+    return {"user_id": body.user_id, "banned": True, "revoked_sessions": revoked}
+
+
+@app.post("/admin/unban")
+def admin_unban(body: AdminBody):
+    """后台解封口子；封禁前的老会话不复活，需重新登录。"""
+    reason = auth.unban_user(body.user_id)
+    if reason is not None:
+        status = 404 if reason is FailureReason.USER_NOT_FOUND else 400
+        _reject(reason, status)
+    return {"user_id": body.user_id, "banned": False}
 
 
 if __name__ == "__main__":

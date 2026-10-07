@@ -48,3 +48,16 @@ def auth(store: InMemoryStore, clock: FakeClock) -> AuthService:
 @pytest.fixture()
 def access(store: InMemoryStore) -> AccessControl:
     return AccessControl(store)
+
+
+# ---- 场景日志：让运行输出能看出覆盖了哪些用例及每个用例的结果 ----
+
+
+def pytest_runtest_logstart(nodeid, location):
+    logger.info(">>>> 场景用例开始: %s", nodeid)
+
+
+def pytest_runtest_logreport(report):
+    if report.when == "call":
+        logger.info("<<<< 场景用例结果: %s -> %s", report.nodeid,
+                    report.outcome.upper())
